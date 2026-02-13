@@ -1,0 +1,27 @@
+[project]
+name = "audiobook"
+version = "0.1.0"
+description = "Convert MP3 files into a single M4B audiobook with chapters, cover art, and metadata"
+readme = "README.md"
+authors = [
+    { email = "norquist.ben@gmail.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+    "mutagen>=1.47",
+    "pyyaml>=6.0",
+    "natsort>=8.0",
+]
+
+[project.scripts]
+audiobook = "audiobook.cli:cli"
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
