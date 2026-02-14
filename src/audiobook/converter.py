@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import platform
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import click
@@ -74,7 +77,7 @@ def determine_bitrate(audio_files: list) -> int:
 
 def convert(
     input_path: str,
-    output: str,
+    output: str | None = None,
     title: str | None = None,
     author: str | None = None,
     narrator: str | None = None,
@@ -113,6 +116,7 @@ def convert(
         mp3_paths = discover_mp3s(input_path)
 
     # Probe files
+    click.echo("Probing {} files...".format(len(mp3_paths)))
     audio_files = probe_files(mp3_paths)
 
     # Build metadata (manifest -> auto-detect -> CLI overrides)
@@ -136,6 +140,13 @@ def convert(
         metadata.genre = genre
     if description is not None:
         metadata.description = description
+
+    # Resolve output path (after metadata is known)
+    if output is None:
+        if metadata.title:
+            output = os.path.join(input_path, "{}.m4b".format(metadata.title))
+        else:
+            output = os.path.join(input_path, "audiobook.m4b")
 
     # Resolve cover image
     cover_path = None
@@ -216,6 +227,22 @@ def _print_dry_run(
     click.echo("")
 
 
+def _pick_aac_encoder() -> str:
+    """Use Apple AudioToolbox encoder on macOS if available, else default aac."""
+    if platform.system() != "Darwin":
+        return "aac"
+    try:
+        result = subprocess.run(
+            [ensure_ffmpeg(), "-encoders"],
+            capture_output=True, text=True,
+        )
+        if "aac_at" in result.stdout:
+            return "aac_at"
+    except Exception:
+        pass
+    return "aac"
+
+
 def _run_ffmpeg(
     audio_files: list,
     metadata: BookMetadata,
@@ -228,6 +255,8 @@ def _run_ffmpeg(
     """Execute ffmpeg to produce the M4B file."""
     ffmpeg = ensure_ffmpeg()
     tmpdir = tempfile.mkdtemp(prefix="audiobook_")
+    total_ms = sum(af.duration_ms for af in audio_files)
+    encoder = _pick_aac_encoder()
 
     try:
         # Write concat file
@@ -260,29 +289,89 @@ def _run_ffmpeg(
             cmd.extend(["-map", "0:a"])
 
         cmd.extend([
-            "-c:a", "aac",
+            "-c:a", encoder,
             "-b:a", "{}k".format(bitrate),
             "-ar", "44100",
+            "-threads", "0",
             "-map_metadata", "1",
             "-map_chapters", "1",
-            "-y",
-            output_path,
         ])
 
-        click.echo("Converting {} files to M4B...".format(len(audio_files)))
+        # Add progress output unless verbose (which shows raw ffmpeg output)
+        if not verbose:
+            cmd.extend(["-progress", "pipe:1", "-nostats"])
+
+        cmd.extend(["-y", output_path])
+
+        click.echo(
+            "Converting {} files to M4B ({} encoder, {} kbps)...".format(
+                len(audio_files), encoder, bitrate
+            )
+        )
 
         if verbose:
             subprocess.run(cmd, check=True)
         else:
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                click.echo("ffmpeg error:", err=True)
-                click.echo(result.stderr, err=True)
-                raise click.ClickException("ffmpeg conversion failed")
+            _run_with_progress(cmd, total_ms)
 
-        click.echo("Done! Output: {}".format(output_path))
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        click.echo("Done! Output: {} ({:.1f} MB)".format(output_path, size_mb))
 
     finally:
-        # Clean up temp files
         import shutil as _shutil
         _shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _run_with_progress(cmd: list, total_ms: int) -> None:
+    """Run ffmpeg and display a progress bar by parsing -progress output."""
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    bar_width = 40
+    last_pct = -1
+
+    try:
+        for line in proc.stdout:
+            line = line.strip()
+            if line.startswith("out_time_us="):
+                try:
+                    time_us = int(line.split("=", 1)[1])
+                except (ValueError, IndexError):
+                    continue
+                time_ms = time_us // 1000
+                if total_ms > 0:
+                    pct = min(100, int(time_ms * 100 / total_ms))
+                else:
+                    pct = 0
+
+                if pct != last_pct:
+                    last_pct = pct
+                    filled = int(bar_width * pct / 100)
+                    bar = "#" * filled + "-" * (bar_width - filled)
+                    elapsed_str = format_duration(time_ms)
+                    total_str = format_duration(total_ms)
+                    sys.stderr.write(
+                        "\r  [{}] {:3d}%  {}/{}".format(
+                            bar, pct, elapsed_str, total_str
+                        )
+                    )
+                    sys.stderr.flush()
+
+        proc.wait()
+        # Clear the progress line
+        sys.stderr.write("\r" + " " * 80 + "\r")
+        sys.stderr.flush()
+
+        if proc.returncode != 0:
+            stderr = proc.stderr.read()
+            click.echo("ffmpeg error:", err=True)
+            click.echo(stderr, err=True)
+            raise click.ClickException("ffmpeg conversion failed")
+    except Exception:
+        proc.kill()
+        proc.wait()
+        raise

@@ -85,7 +85,7 @@ def init(input_path: str, output: str | None):
 
 @cli.command(name="convert")
 @click.argument("input_path", type=click.Path(exists=True, file_okay=False))
-@click.option("-o", "--output", default="audiobook.m4b", help="Output .m4b file path")
+@click.option("-o", "--output", default=None, help="Output .m4b file path (default: INPUT_PATH/audiobook.m4b)")
 @click.option("--title", default=None, help="Book title")
 @click.option("--author", default=None, help="Author name")
 @click.option("--narrator", default=None, help="Narrator name")

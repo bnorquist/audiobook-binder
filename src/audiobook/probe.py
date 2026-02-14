@@ -67,6 +67,16 @@ def probe_file(filepath: str) -> AudioFile:
     )
 
 
-def probe_files(filepaths: list[str]) -> list[AudioFile]:
-    """Probe multiple files and return a list of AudioFiles."""
-    return [probe_file(fp) for fp in filepaths]
+def probe_files(filepaths: list[str], max_workers: int | None = None) -> list[AudioFile]:
+    """Probe multiple files in parallel and return a list of AudioFiles.
+
+    Preserves input ordering. Uses threads since the work is subprocess I/O.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if max_workers is None:
+        max_workers = min(8, len(filepaths))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        results = list(pool.map(probe_file, filepaths))
+    return results
