@@ -2,14 +2,14 @@
 
 import os
 
-from audiobook.manifest import (
+from audiobook_binder.manifest import (
     generate_manifest_yaml,
     get_chapter_titles,
     get_file_order,
     get_metadata,
     load_manifest,
 )
-from audiobook.models import BookMetadata
+from audiobook_binder.models import BookMetadata
 
 
 def test_load_manifest(tmp_dir):

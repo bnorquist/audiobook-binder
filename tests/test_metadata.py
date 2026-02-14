@@ -1,13 +1,13 @@
 """Tests for metadata extraction and FFMETADATA generation."""
 
-from audiobook.metadata import (
+from audiobook_binder.metadata import (
     build_chapters,
     clean_chapter_name,
     format_duration,
     generate_ffmetadata,
     resolve_chapter_name,
 )
-from audiobook.models import AudioFile, BookMetadata
+from audiobook_binder.models import AudioFile, BookMetadata
 
 
 def test_clean_chapter_name_strips_numbering():
@@ -108,5 +108,5 @@ def test_format_duration():
 
 
 def _chapter(title, start, end):
-    from audiobook.models import Chapter
+    from audiobook_binder.models import Chapter
     return Chapter(title=title, start_ms=start, end_ms=end, source_file="test.mp3")

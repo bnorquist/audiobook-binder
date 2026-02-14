@@ -1,6 +1,6 @@
 """Tests for the ffprobe wrapper."""
 
-from audiobook.probe import probe_file, probe_files
+from audiobook_binder.probe import probe_file, probe_files
 
 
 def test_probe_file_returns_audio_file(make_mp3, tmp_dir):

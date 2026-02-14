@@ -4,8 +4,8 @@ import os
 
 from click.testing import CliRunner
 
-from audiobook.cli import cli
-from audiobook.converter import determine_bitrate, discover_mp3s
+from audiobook_binder.cli import cli
+from audiobook_binder.converter import determine_bitrate, discover_mp3s
 
 
 def test_discover_mp3s_natural_sort(sample_mp3s):

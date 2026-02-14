@@ -1,5 +1,5 @@
 [project]
-name = "audiobook"
+name = "audiobook-binder"
 version = "0.1.0"
 description = "Convert MP3 files into a single M4B audiobook with chapters, cover art, and metadata"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-audiobook = "audiobook.cli:cli"
+audiobook-binder = "audiobook_binder.cli:cli"
 
 [build-system]
 requires = ["uv_build>=0.10.2,<0.11.0"]
